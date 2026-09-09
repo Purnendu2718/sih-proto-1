@@ -1,0 +1,39 @@
+================================================================================
+FORMAL PRESERVATION & REQUISITION DIRECTIVE UNDER SECTION 94 BNSS
+(Formerly Section 91 of the Code of Criminal Procedure, 1973)
+Issued by: Cyber Crime Police Station / Law Enforcement Agency (India)
+================================================================================
+
+Case Reference / FIR No.: FIR-2026/CYBER-402/GSV
+Date & Time of Requisition: 2026-09-08 19:22:20 UTC
+Jurisdiction: Indian Cyber Crime Coordination Centre (I4C) Protocol
+
+TO:
+The Nodal / Legal Compliance Officer
+Virtual Asset Service Provider (VASP): CoinDCX
+Contact Email: compliance@coindcx.com
+
+SUBJECT: IMMEDIATE ASSET FREEZE, KYC PRESERVATION & LOG SUBMISSION FOR SUSPECT ACCOUNT
+
+1. STATUTORY MANDATE:
+Under powers conferred by Section 94 of Bharatiya Nagarik Suraksha Sanhita, 2023 (BNSS),
+you are hereby directed to immediately FREEZE all withdrawals and outbound transfers
+associated with the identified customer deposit wallet specified below.
+
+2. FORENSIC ATTRIBUTION DETAILS:
+- Target Deposit Wallet : 0x9876543210fedcba9876543210fedcba98765432
+- Blockchain Network    : EVM (Ethereum / BSC / Polygon)
+- Sweep Transaction Hash: 0x8f2d9c1b4e6a7350129fec8714b35029e8471c039581a62048fbc927160359da
+- Master Hot Wallet     : 0x71c3fb9904d3e33e9d8f8e02d847b74f38e63021
+- Attribution Heuristic : 96% (CEX Automated Sweep Signature Detected)
+
+3. REQUISITION REQUIREMENTS (Within 2 Hours SLA):
+a) Complete KYC records (PAN, Aadhaar, Passport, Phone, Email, Bank Accounts linked).
+b) All IP login logs with port numbers and timestamps.
+c) Immediate debit freeze on associated INR and crypto trading balances.
+
+4. DIGITAL EVIDENCE INTEGRITY CERTIFICATE (Section 63 BSA, 2023):
+The blockchain forensic data was captured via verified deterministic RPC feeds.
+Cryptographic SHA-256 Digest:
+0326384f75df18b5b838de502c2ce6409726ffb2c0469367ea386c3fc676dda3
+================================================================================

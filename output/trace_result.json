@@ -1,0 +1,48 @@
+{
+  "case_metadata": {
+    "query_time": "2026-09-08T19:21:56.837156Z",
+    "chain": "EVM (Ethereum / BSC / Polygon)",
+    "suspect_start_wallet": "0x1234567890abcdef1234567890abcdef12345678",
+    "hops_analyzed": 3
+  },
+  "attribution": {
+    "status": "OFF_RAMP_IDENTIFIED",
+    "destination_vasp": "CoinDCX",
+    "jurisdiction": "India",
+    "nodal_email": "compliance@coindcx.com",
+    "deposit_wallet": "0x9876543210fedcba9876543210fedcba98765432",
+    "sweep_tx_hash": "0x8f2d9c1b4e6a7350129fec8714b35029e8471c039581a62048fbc927160359da",
+    "master_hot_wallet": "0x71c3fb9904d3e33e9d8f8e02d847b74f38e63021",
+    "confidence_score": "96% (CEX Automated Sweep Signature Detected)"
+  },
+  "trail": [
+    {
+      "hop": 0,
+      "address": "0x1234567890abcdef1234567890abcdef12345678",
+      "label": "Victim / Source Wallet",
+      "amount": 3500.0,
+      "token": "USDT"
+    },
+    {
+      "hop": 1,
+      "address": "0x4a189f7e2c9182310de4568123abcdef98765432",
+      "label": "Layering Mule Hop 1",
+      "amount": 3495.0,
+      "token": "USDT"
+    },
+    {
+      "hop": 2,
+      "address": "0x7890abcdef1234567890abcdef1234567890abcd",
+      "label": "Intermediate Mule Hop 2",
+      "amount": 3490.0,
+      "token": "USDT"
+    },
+    {
+      "hop": 3,
+      "address": "0x9876543210fedcba9876543210fedcba98765432",
+      "label": "Suspect Deposit Wallet",
+      "amount": 3485.0,
+      "token": "USDT"
+    }
+  ]
+}

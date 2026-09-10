@@ -3,15 +3,6 @@
 #include <string.h>
 #include "tracer_core.h"
 
-/*
- * Note for evaluators/judges:
- * BFS expansion step is O(E) against the linear edge scan; for retail fraud graphs
- * targeted by CryptoTrace-Sentinel (tens to low-hundreds of edges per case),
- * execution is sub-millisecond in practice (<0.1 ms), matching the 1-click <5s mandate.
- * TODO: If a future case load exceeds ~5,000 edges, replace the linear scan in the inner
- * loop with a hash-map adjacency list keyed on from_addr.
- */
-
 Graph* graph_create(int initial_capacity) {
     Graph* g = (Graph*)malloc(sizeof(Graph));
     g->edges = (Edge*)malloc(sizeof(Edge) * initial_capacity);

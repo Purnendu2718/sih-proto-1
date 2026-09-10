@@ -9,12 +9,9 @@ _COINGECKO_IDS = {
 
 
 def get_historical_inr_price(symbol: str, date_ddmmyyyy: str) -> float:
-    """date_ddmmyyyy format: 'DD-MM-YYYY', matching CoinGecko's history
-    endpoint. Returns 0.0 on any failure — the caller MUST treat 0.0 as
-    'unavailable', not as a genuine zero-value price, and prompt the
-    investigating officer for a manually sourced valuation instead."""
-    require_online("get_historical_inr_price")
-
+    """date_ddmmyyyy: 'DD-MM-YYYY'. Returns 0.0 on any failure — the
+    caller MUST treat 0.0 as 'unavailable', not a real zero price, and
+    prompt for a manually sourced valuation instead."""
     cache_key = (symbol.upper(), date_ddmmyyyy)
     if cache_key in _CACHE:
         return _CACHE[cache_key]
@@ -22,6 +19,12 @@ def get_historical_inr_price(symbol: str, date_ddmmyyyy: str) -> float:
     coin_id = _COINGECKO_IDS.get(symbol.upper())
     if not coin_id:
         return 0.0
+
+    try:
+        require_online("historical_price_service.get_historical_inr_price")
+    except RuntimeError:
+        return 0.0
+
     try:
         resp = requests.get(
             f"https://api.coingecko.com/api/v3/coins/{coin_id}/history",
@@ -30,6 +33,6 @@ def get_historical_inr_price(symbol: str, date_ddmmyyyy: str) -> float:
         resp.raise_for_status()
         price = resp.json().get("market_data", {}).get("current_price", {}).get("inr", 0.0)
         _CACHE[cache_key] = price
-        return float(price)
+        return price
     except Exception:
         return 0.0

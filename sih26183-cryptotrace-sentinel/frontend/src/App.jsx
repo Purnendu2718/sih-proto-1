@@ -1,320 +1,159 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import Navbar from "./components/Navbar";
-import LandingView from "./components/LandingView";
-import InvestigateView from "./components/InvestigateView";
-import CasesView from "./components/CasesView";
-import IntelligenceView from "./components/IntelligenceView";
-import EvidenceView from "./components/EvidenceView";
-import CommandPalette from "./components/CommandPalette";
-import DiagnosticsDrawer from "./components/DiagnosticsDrawer";
-import NoticeModal from "./components/NoticeModal";
-import NewCaseModal from "./components/NewCaseModal";
-import EvidenceModal from "./components/EvidenceModal";
+import { useState, useRef, useCallback } from "react";
+import GraphCanvas from "./components/GraphCanvas";
+import FilterToolbar from "./components/FilterToolbar";
+import ForensicDrawer from "./components/ForensicDrawer";
+import GoldenHourTimer from "./components/GoldenHourTimer";
+import FreezeNoticeForm from "./components/FreezeNoticeForm";
+import { searchQuery, expandNode, startTrace, getTraceGraph, autoInvestigate } from "./api";
 
-import {
-  startTrace,
-  getTraceGraph,
-  getOffRamp,
-  expandNode,
-  getVaspAttribution,
-} from "./services/api";
-import { SAMPLE_PRESETS } from "./components/SearchBar";
-import { mockScenarios } from "./data/mockScenarios.js";
-
-const defaultScenario = mockScenarios.task_scam_tron;
+const SAMPLE_CASES = [
+  { label: "Task Scam (TRON/USDT)", address: "TVictim0001XXXXXXXXXXXXXXXXXXXXXXX", chain: "TRON" },
+  { label: "Investment Scam (EVM/USDT)", address: "0xVictim0000000000000000000000000000001", chain: "EVM" },
+];
 
 export default function App() {
-  // Navigation View State: "overview" | "investigate" | "cases" | "intelligence" | "evidence"
-  const [activeView, setActiveView] = useState("overview");
+  const [query, setQuery] = useState("");
+  const [graph, setGraph] = useState({ nodes: [], edges: [] });
+  const [transfers, setTransfers] = useState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [layoutName, setLayoutName] = useState("dag");
+  const [filters, setFilters] = useState({ minUsd: 0, token: "ALL" });
+  const [fallback, setFallback] = useState(null);
+  const [investigation, setInvestigation] = useState(null);
+  const [startedAt, setStartedAt] = useState(null);
+  const [showFreezeForm, setShowFreezeForm] = useState(false);
+  const cyApiRef = useRef(null);
 
-  // Investigation & Target State: Pre-hydrated with default scenario to prevent black screen
-  const [targetWallet, setTargetWallet] = useState(SAMPLE_PRESETS.TRON.address);
-  const [caseId, setCaseId] = useState(defaultScenario.case_id);
-  const [detectedChain, setDetectedChain] = useState(defaultScenario.detected_chain);
-  const [dataSource, setDataSource] = useState("standalone_cloud_preview");
-  const [traceTimeMs, setTraceTimeMs] = useState(0.045);
-  const [graph, setGraph] = useState(defaultScenario.graph);
-  const [filteredEdges, setFilteredEdges] = useState(defaultScenario.graph.edges || []);
-  const [layoutName, setLayoutName] = useState("dagre");
-  const [loading, setLoading] = useState(false);
+  const mergeGraph = useCallback((incoming) => {
+    setGraph((prev) => {
+      const nodeMap = new Map(prev.nodes.map((n) => [n.id, n]));
+      incoming.nodes.forEach((n) => nodeMap.set(n.id, n));
+      const edgeKey = (e) => `${e.tx_hash}-${e.source}-${e.target}`;
+      const edgeMap = new Map(prev.edges.map((e) => [edgeKey(e), e]));
+      incoming.edges.forEach((e) => edgeMap.set(edgeKey(e), e));
+      return { nodes: [...nodeMap.values()], edges: [...edgeMap.values()] };
+    });
+    setTransfers((prev) => [...prev, ...incoming.edges]);
+  }, []);
 
-  // Inspector & Off-Ramp State
-  const [selectedElement, setSelectedElement] = useState(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [highlightedTxHashes, setHighlightedTxHashes] = useState(
-    defaultScenario.off_ramp?.path?.map((p) => p.tx_hash).filter(Boolean) || []
-  );
-  const [offRampResult, setOffRampResult] = useState(defaultScenario.off_ramp);
-  const [offRampLoading, setOffRampLoading] = useState(false);
+  const runInvestigation = async (address) => {
+    setFallback(null);
+    setStartedAt(Date.now());
+    const auto = await autoInvestigate({ victim_address: address, case_id: `CASE-${Date.now()}` });
+    setInvestigation(auto);
 
-  // Modals & Panels State
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
-  const [noticeModalOpen, setNoticeModalOpen] = useState(false);
-  const [newCaseModalOpen, setNewCaseModalOpen] = useState(false);
-  const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
-
-  // Cytoscape Reference
-  const cyRef = useRef(null);
-
-  // Execute Forensic Trace
-  const handleLaunchTrace = async (addressToTrace = targetWallet) => {
-    const queryAddr = (addressToTrace || "").trim();
-    if (!queryAddr) return;
-
-    setLoading(true);
-    setSelectedElement(null);
-    setDrawerOpen(false);
-
-    try {
-      const startRes = await startTrace({
-        address: queryAddr,
-        fir_number: "FIR/CYBER/2026/0402",
-        use_mock_fallback: true,
-      });
-
-      const activeCase = startRes.case_id || startRes.trace_id || "CASE-SIH-2026";
-      setCaseId(activeCase);
-      setDetectedChain(startRes.detected_chain || "TRON");
-      setDataSource(startRes.data_source);
-      setTraceTimeMs(startRes.trace_time_ms || 0.05);
-
-      // Fetch Graph Data
-      const graphData = await getTraceGraph(activeCase);
-      setGraph(graphData);
-      setFilteredEdges(graphData.edges || []);
-
-      // Auto-Search Nearest CEX Off-Ramp
-      try {
-        setOffRampLoading(true);
-        const offRampRes = await getOffRamp(activeCase, 50);
-        setOffRampResult(offRampRes);
-        if (offRampRes?.found && offRampRes?.path?.length > 0) {
-          const hashes = offRampRes.path.map((p) => p.tx_hash).filter(Boolean);
-          setHighlightedTxHashes(hashes);
-        } else {
-          setHighlightedTxHashes([]);
-        }
-      } catch (err) {
-        console.warn("Off-ramp query notice:", err);
-      } finally {
-        setOffRampLoading(false);
-      }
-
-      // Switch to Investigate View
-      setActiveView("investigate");
-    } catch (err) {
-      console.error("Trace failure:", err);
-      alert(`Forensic trace failed: ${err.message || err}`);
-    } finally {
-      setLoading(false);
+    const result = await searchQuery({ query: address });
+    if (!result.graph.nodes.length) {
+      setFallback({ reason: "network_unavailable" });
+      return;
     }
+    setGraph(result.graph);
+    setTransfers(result.graph.edges);
   };
 
-  // Run Guided Demo on Mount or Click
-  const handleRunDemo = () => {
-    setTargetWallet(SAMPLE_PRESETS.TRON.address);
-    handleLaunchTrace(SAMPLE_PRESETS.TRON.address);
+  const handleSearch = () => query && runInvestigation(query);
+
+  const handleLoadSample = async (sample) => {
+    setFallback(null);
+    setStartedAt(Date.now());
+    const result = await startTrace({
+      case_id: `DEMO-${sample.chain}`, fir_number: "FIR/2026/00123",
+      start_address: sample.address, chain: sample.chain, data_mode: "mock",
+    });
+    setInvestigation({
+      reached_exchange: result.reached_exchange,
+      exchange_attribution_message: result.exchange_attribution_message,
+      hop_count: result.hop_count, trace_time_ms: result.trace_time_ms,
+    });
+    const g = await getTraceGraph(result.trace_id);
+    setGraph(g);
+    setTransfers(g.edges);
   };
 
-  // Trigger Trace for specific presets
-  const handleSelectPreset = (presetKey) => {
-    const p = SAMPLE_PRESETS[presetKey];
-    if (p) {
-      setTargetWallet(p.address);
-      handleLaunchTrace(p.address);
-    }
+  const handleExpandNode = async (nodeId) => {
+    const node = graph.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const expanded = await expandNode({ address: nodeId, chain: node.chain, direction: "both" });
+    mergeGraph(expanded);
   };
 
-  // Node Selection Handler
-  const handleNodeSelect = (item) => {
-    setSelectedElement(item);
-    setDrawerOpen(true);
+  const handleExport = (format) => {
+    const cy = cyApiRef.current;
+    if (!cy) return;
+    const blob = (format === "png" || typeof cy.svg !== "function")
+      ? cy.png({ full: true, output: "blob" })
+      : new Blob([cy.svg()], { type: "image/svg+xml" });
+    const ext = (format === "png" || typeof cy.svg !== "function") ? "png" : "svg";
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cryptotrace-graph.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
-
-  // Edge Selection Handler
-  const handleEdgeSelect = (item) => {
-    setSelectedElement(item);
-    setDrawerOpen(true);
-  };
-
-  // Dynamic Counterparty Expansion
-  const handleExpandNode = async (address) => {
-    if (!caseId || !address) return;
-    try {
-      const res = await expandNode(caseId, address, "both");
-      if (res && res.new_nodes && res.new_nodes.length > 0) {
-        setGraph((prev) => {
-          if (!prev) return prev;
-          const existingNodeIds = new Set(prev.nodes.map((n) => n.id));
-          const existingEdgeKeys = new Set(
-            prev.edges.map((e) => `${e.source}_${e.target}_${e.tx_hash}`)
-          );
-
-          const addedNodes = res.new_nodes.filter((n) => !existingNodeIds.has(n.id));
-          const addedEdges = res.new_edges.filter(
-            (e) => !existingEdgeKeys.has(`${e.source}_${e.target}_${e.tx_hash}`)
-          );
-
-          const updatedGraph = {
-            ...prev,
-            nodes: [...prev.nodes, ...addedNodes],
-            edges: [...prev.edges, ...addedEdges],
-          };
-
-          setFilteredEdges(updatedGraph.edges);
-          return updatedGraph;
-        });
-      }
-    } catch (err) {
-      console.warn("Dynamic node expansion failed:", err);
-    }
-  };
-
 
   return (
-    <div className="min-h-screen w-full bg-[#07111F] text-[#F5F7FA] flex flex-col selection:bg-[#00AEEF]/25 selection:text-[#F5F7FA]">
-      {/* 1. Slim, Elegant, Reference-Style Top Navigation */}
-      <Navbar
-        activeView={activeView}
-        onViewChange={setActiveView}
-        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-        onOpenNewCase={() => setNewCaseModalOpen(true)}
-        onOpenDiagnostics={() => setDiagnosticsOpen(true)}
-        cCoreLatency={traceTimeMs}
-        hasActiveCase={Boolean(caseId)}
-      />
-
-      {/* 2. Main Viewport Content Switching */}
-      <main className="flex-1 w-full">
-        {activeView === "overview" && (
-          <LandingView
-            onStartInvestigation={() => setActiveView("investigate")}
-            onRunDemo={handleRunDemo}
-            onSelectPreset={handleSelectPreset}
-          />
-        )}
-
-        {activeView === "investigate" && (
-          <InvestigateView
-            targetWallet={targetWallet}
-            onTargetWalletChange={setTargetWallet}
-            onLaunchTrace={handleLaunchTrace}
-            loading={loading}
-            graph={graph}
-            filteredEdges={filteredEdges}
-            layoutName={layoutName}
-            onLayoutChange={setLayoutName}
-            highlightedTxHashes={highlightedTxHashes}
-            onFindNearestExchange={() => handleLaunchTrace(targetWallet)}
-            offRampLoading={offRampLoading}
-            offRampResult={offRampResult}
-            onNodeSelect={handleNodeSelect}
-            onEdgeSelect={handleEdgeSelect}
-            selectedElement={selectedElement}
-            drawerOpen={drawerOpen}
-            onCloseDrawer={() => {
-              setDrawerOpen(false);
-              setSelectedElement(null);
-            }}
-            onExpandNode={handleExpandNode}
-            onOpenNoticeModal={() => setNoticeModalOpen(true)}
-            onOpenEvidenceModal={() => setEvidenceModalOpen(true)}
-            caseId={caseId}
-            detectedChain={detectedChain}
-            traceTimeMs={traceTimeMs}
-            cyRef={cyRef}
-          />
-        )}
-
-        {activeView === "cases" && (
-          <CasesView
-            onOpenCase={(addr, cid) => {
-              setTargetWallet(addr);
-              setCaseId(cid);
-              handleLaunchTrace(addr);
-            }}
-            onOpenNewCase={() => setNewCaseModalOpen(true)}
-          />
-        )}
-
-        {activeView === "intelligence" && (
-          <IntelligenceView
-            onInvestigateAddress={(addr) => {
-              setTargetWallet(addr);
-              handleLaunchTrace(addr);
-            }}
-          />
-        )}
-
-        {activeView === "evidence" && (
-          <EvidenceView
-            caseId={caseId}
-            brief={graph?.brief}
-            graph={graph}
-            onOpenNoticeModal={() => setNoticeModalOpen(true)}
-          />
-        )}
-      </main>
-
-      {/* 3. Global Command Palette (⌘K / Ctrl+K) */}
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-        onSelectAction={(act) => {
-          if (act.type === "navigate") setActiveView(act.view);
-          if (act.type === "open_notice") setNoticeModalOpen(true);
-          if (act.type === "open_palette") setCommandPaletteOpen(true);
-        }}
-        onStartTrace={(addr) => {
-          setTargetWallet(addr);
-          handleLaunchTrace(addr);
-        }}
-      />
-
-      {/* 4. Diagnostics & Sovereign Infrastructure Drawer */}
-      <DiagnosticsDrawer
-        isOpen={diagnosticsOpen}
-        onClose={() => setDiagnosticsOpen(false)}
-        cCoreLatency={traceTimeMs}
-        dataSource={dataSource}
-        detectedChain={detectedChain}
-        nodeCount={graph?.nodes?.length || 8}
-        edgeCount={graph?.edges?.length || 7}
-      />
-
-      {/* 5. Statutory Preservation Directive Modal (Section 94 BNSS) */}
-      <NoticeModal
-        isOpen={noticeModalOpen}
-        onClose={() => setNoticeModalOpen(false)}
-        brief={graph?.brief}
-        currentChain={detectedChain}
-        caseId={caseId}
-      />
-
-      {/* 6. New Case Modal */}
-      {newCaseModalOpen && (
-        <NewCaseModal
-          isOpen={newCaseModalOpen}
-          onClose={() => setNewCaseModalOpen(false)}
-          onCaseCreated={(newCase) => {
-            if (newCase?.targetAddress) {
-              setTargetWallet(newCase.targetAddress);
-              handleLaunchTrace(newCase.targetAddress);
-            }
-            setNewCaseModalOpen(false);
-          }}
+    <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-700">
+        <h1 className="text-lg font-semibold mr-2">CryptoTrace-Sentinel</h1>
+        <GoldenHourTimer startedAt={startedAt} />
+        <input
+          value={query} onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          placeholder="Victim-reported address or tx hash (TRON / EVM / BTC)"
+          className="flex-1 bg-gray-800 rounded px-3 py-2 text-sm"
         />
+        <button onClick={handleSearch} className="bg-blue-600 px-4 py-2 rounded text-sm">Investigate</button>
+        <button onClick={() => setShowFreezeForm(true)} className="bg-red-700 px-4 py-2 rounded text-sm">
+          Freeze Notice
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-700 text-xs">
+        <span className="text-gray-400">Offline demo cases:</span>
+        {SAMPLE_CASES.map((s) => (
+          <button key={s.address} onClick={() => handleLoadSample(s)} className="bg-gray-700 px-2 py-1 rounded">
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {investigation && (
+        <div className={`text-sm px-4 py-2 ${investigation.reached_exchange ? "bg-emerald-900/40 text-emerald-200" : "bg-gray-800 text-gray-300"}`}>
+          {investigation.reached_exchange
+            ? `Reached exchange in ${investigation.hop_count} hop(s), ${investigation.trace_time_ms}ms — ${investigation.exchange_attribution_message || "attribution pending manual confirmation"}`
+            : "No exchange off-ramp found within the configured hop/time bounds yet."}
+        </div>
       )}
 
-      {/* 7. Digital Evidence Modal */}
-      {evidenceModalOpen && (
-        <EvidenceModal
-          isOpen={evidenceModalOpen}
-          onClose={() => setEvidenceModalOpen(false)}
-          caseId={caseId}
-        />
+      {fallback && (
+        <div className="bg-amber-900/40 text-amber-200 text-sm px-4 py-2">
+          Live data source unavailable. Use one of the offline demo cases above for a reliable walkthrough.
+        </div>
       )}
+
+      <FilterToolbar
+        filters={filters} onFiltersChange={setFilters}
+        layoutName={layoutName} onLayoutChange={setLayoutName}
+        onExport={handleExport}
+        onResetLayout={() => setLayoutName("dag")}
+        onZoomToFit={() => cyApiRef.current?.fit(undefined, 40)}
+      />
+
+      <div className="flex-1 relative">
+        <GraphCanvas
+          graph={graph} layoutName={layoutName} filters={filters}
+          onNodeSelect={setSelectedNode} onEdgeSelect={() => {}}
+          onExpandNode={handleExpandNode} cyApiRef={cyApiRef}
+        />
+        <ForensicDrawer
+          node={selectedNode} transfers={transfers}
+          onClose={() => setSelectedNode(null)}
+          onCopyAddress={(addr) => navigator.clipboard.writeText(addr)}
+        />
+      </div>
+
+      {showFreezeForm && <FreezeNoticeForm onClose={() => setShowFreezeForm(false)} />}
     </div>
   );
 }

@@ -1,76 +1,14 @@
 {
   "vasps": [
-    {
-      "name": "CoinDCX",
-      "jurisdiction": "India",
-      "nodal_officer_email": "compliance@coindcx.com",
-      "compliance_email": "compliance@coindcx.com",
-      "sla_hours": 2,
-      "hot_wallets": [
-        "0x71c3fb9904d3e33e9d8f8e02d847b74f38e63021",
-        "TYDzsYUEpvnYmQk4zGP9sWWcTEd2MiAtW6",
-        "TCoinDCXHotWallet01XXXXXXXXXXXXXXXX"
-      ],
-      "known_deposit_addresses": [
-        "TCoinDCXDeposit0001XXXXXXXXXXXXXXXX",
-        "0xCoinDCXDeposit000000000000000000000001"
-      ]
-    },
-    {
-      "name": "WazirX",
-      "jurisdiction": "India",
-      "nodal_officer_email": "nodal@wazirx.com",
-      "compliance_email": "nodal@wazirx.com",
-      "sla_hours": 2,
-      "hot_wallets": [
-        "0x5bf49e917d52f6c9c6bb1115383a15bb7c40d6d5",
-        "TNPeeaaFB7K9cmo4uQEXUFsGoM6FiReZxk",
-        "1WazirXHotWallet11111111111111111"
-      ],
-      "known_deposit_addresses": [
-        "TWazirXDeposit0001XXXXXXXXXXXXXXXXXX",
-        "0xWazirXDeposit000000000000000000000001",
-        "1WazirXDeposit111111111111111111111"
-      ]
-    },
-    {
-      "name": "ZebPay",
-      "jurisdiction": "India",
-      "nodal_officer_email": "compliance@zebpay.com",
-      "compliance_email": "compliance@zebpay.com",
-      "sla_hours": 2,
-      "hot_wallets": [
-        "0x98c3d3183c4b8a650614ad179a1a98be0a8d6b8e",
-        "TMuA6YqfCeX8EhbfYEg5y7S4Dqz9Dw922w",
-        "3ZebPayHotWallet333333333333333333"
-      ],
-      "known_deposit_addresses": [
-        "TZebPayDeposit0001XXXXXXXXXXXXXXXXXX",
-        "0xZebPayDeposit000000000000000000000001"
-      ]
-    },
-    {
-      "name": "Binance",
-      "jurisdiction": "International",
-      "nodal_officer_email": "case@binance.com",
-      "compliance_email": "case@binance.com",
-      "sla_hours": 4,
-      "hot_wallets": [
-        "0x28c6c06298d514db089934071355e5743bf21d60",
-        "TDqSquUnTG8Px5stYoqZwPyBpys2b7KwmD",
-        "0xBinanceHotWallet000000000000000000001"
-      ],
-      "known_deposit_addresses": [
-        "0xBinanceDeposit000000000000000000000001",
-        "TBinanceDeposit0001XXXXXXXXXXXXXXXXX"
-      ]
-    }
-  ],
-  "mixers": [
-    {
-      "name": "Tornado Cash (ETH)",
-      "contract": "0xd90e2f925da726b50c4ed8d0fb90ad053324f31b",
-      "risk_score_penalty": 45
-    }
+    { "name": "CoinDCX", "compliance_email": "compliance@coindcx.com", "jurisdiction": "India",
+      "hot_wallets": ["TCoinDCXHotWallet01XXXXXXXXXXXXXXXX"],
+      "known_deposit_addresses": ["TCoinDCXDeposit0001XXXXXXXXXXXXXXXX"] },
+    { "name": "WazirX", "compliance_email": "compliance@wazirx.com", "jurisdiction": "India",
+      "hot_wallets": [], "known_deposit_addresses": [] },
+    { "name": "ZebPay", "compliance_email": "compliance@zebpay.com", "jurisdiction": "India",
+      "hot_wallets": [], "known_deposit_addresses": [] },
+    { "name": "Binance", "compliance_email": "compliance@binance.com", "jurisdiction": "Global",
+      "hot_wallets": ["0xBinanceHotWallet000000000000000000001"],
+      "known_deposit_addresses": ["0xBinanceDeposit0000000000000000000001"] }
   ]
 }

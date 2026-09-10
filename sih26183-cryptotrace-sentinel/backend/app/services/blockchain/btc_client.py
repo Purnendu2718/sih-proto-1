@@ -1,125 +1,61 @@
-"""
-btc_client.py - Live Bitcoin blockchain client querying Mempool.space API.
-Parses UTXO inputs and outputs, distinguishing payment outputs from change outputs.
-"""
-
-from typing import List, Dict, Any, Optional
 import requests
-import logging
-from .base_client import BaseBlockchainClient, BlockchainClientError
-from .resilient_fetch import BlockchainFetchError
-from app.core.config import settings
+from typing import Optional
+from .resilient_fetch import resilient
 from app.services.air_gapped_guard import require_online
 from app.services.evidence_ledger import record_raw_evidence
 
-logger = logging.getLogger(__name__)
+MEMPOOL_BASE = "https://mempool.space/api"
 
 
-class BtcClient(BaseBlockchainClient):
-    """Bitcoin UTXO ingestion client using public Mempool.space API."""
+@resilient
+def get_address_transfers(address: str, limit: int = 50, case_id: Optional[str] = None) -> list:
+    require_online("btc_client.get_address_transfers")
+    url = f"{MEMPOOL_BASE}/address/{address}/txs"
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+    payload = resp.json()
+    if case_id:
+        record_raw_evidence(case_id, "btc_client.get_address_transfers", {"txs": payload})
 
-    def __init__(self, base_url: Optional[str] = None):
-        super().__init__(chain_name="BTC")
-        self.base_url = base_url or settings.MEMPOOL_BASE_URL
-
-    def get_address_transactions(self, address: str, limit: int = 50, case_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Fetch UTXO transactions for a Bitcoin address and parse inputs/outputs.
-        Distinguishes payment outputs from change outputs.
-        """
-        require_online("get_address_transactions")
-        addr_clean = (address or "").strip()
-        url = f"{self.base_url}/address/{addr_clean}/txs"
-
-        try:
-            resp = requests.get(url, timeout=10)
-            resp.raise_for_status()
-
-            raw_txs = resp.json()
-            if case_id:
-                record_raw_evidence(case_id, "btc_client.get_address_transactions", raw_txs)
-
-            if not isinstance(raw_txs, list):
-                return []
-
-            transfers: List[Dict[str, Any]] = []
-
-            for tx in raw_txs[:limit]:
-                tx_hash = tx.get("txid", "")
-                status = tx.get("status", {})
-                block_time = status.get("block_time", 0)
-
-                vins = tx.get("vin", [])
-                vouts = tx.get("vout", [])
-
-                input_addrs = set()
-                for vin in vins:
-                    prevout = vin.get("prevout") or {}
-                    in_addr = prevout.get("scriptpubkey_address")
-                    if in_addr:
-                        input_addrs.add(in_addr)
-
-                # Case A: Outbound from target address
-                if addr_clean in input_addrs:
-                    external_outputs = [
-                        vo for vo in vouts
-                        if vo.get("scriptpubkey_address") and vo.get("scriptpubkey_address") not in input_addrs
-                    ]
-                    for out in (external_outputs or vouts):
-                        out_addr = out.get("scriptpubkey_address")
-                        if out_addr and out_addr not in input_addrs:
-                            val_btc = float(out.get("value", 0)) / 1e8
-                            transfers.append(
-                                self.normalize_transfer(
-                                    from_addr=addr_clean,
-                                    to_addr=out_addr,
-                                    amount=val_btc,
-                                    token="BTC",
-                                    timestamp_utc=block_time,
-                                    tx_hash=tx_hash,
-                                    is_primary=True,
-                                )
-                            )
-                else:
-                    # Case B: Inbound to target address
-                    for out in vouts:
-                        if out.get("scriptpubkey_address") == addr_clean:
-                            val_btc = float(out.get("value", 0)) / 1e8
-                            from_addr = list(input_addrs)[0] if input_addrs else "Unknown_Sender"
-                            transfers.append(
-                                self.normalize_transfer(
-                                    from_addr=from_addr,
-                                    to_addr=addr_clean,
-                                    amount=val_btc,
-                                    token="BTC",
-                                    timestamp_utc=block_time,
-                                    tx_hash=tx_hash,
-                                    is_primary=True,
-                                )
-                            )
-
-            return transfers
-        except requests.RequestException as exc:
-            logger.warning(f"Mempool.space API request failed for {address}: {exc}")
-            raise BlockchainFetchError(f"Bitcoin mempool connection failure: {exc}")
-
-    def get_transaction_details(self, tx_hash: str, case_id: Optional[str] = None) -> Dict[str, Any]:
-        require_online("get_transaction_details")
-        url = f"{self.base_url}/tx/{tx_hash}"
-        try:
-            resp = requests.get(url, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            if case_id:
-                record_raw_evidence(case_id, "btc_client.get_transaction_details", data)
-            return data
-        except requests.RequestException as exc:
-            raise BlockchainFetchError(f"Bitcoin tx fetch failed: {exc}")
+    out = []
+    for tx in payload[:limit]:
+        txid = tx["txid"]
+        ts = tx.get("status", {}).get("block_time", 0)
+        vouts = tx.get("vout", [])
+        looks_like_change_branch = len(vouts) > 2
+        for vin in tx.get("vin", []):
+            prevout = vin.get("prevout") or {}
+            src = prevout.get("scriptpubkey_address")
+            if not src:
+                continue
+            for idx, vout in enumerate(vouts):
+                dest = vout.get("scriptpubkey_address")
+                value = (vout.get("value", 0) or 0) / 1e8
+                if not dest or src == dest or value <= 0:
+                    continue
+                out.append({
+                    "from": src, "to": dest, "token_symbol": "BTC", "amount": value,
+                    "timestamp_utc": ts, "tx_hash": txid, "chain": "BTC",
+                    "is_likely_change": looks_like_change_branch and idx == len(vouts) - 1,
+                })
+    return out
 
 
-_DEFAULT_BTC_CLIENT = BtcClient()
-
-
-def get_address_transfers(address: str, case_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    require_online("get_address_transfers")
-    return _DEFAULT_BTC_CLIENT.get_address_transactions(address, case_id=case_id)
+@resilient
+def get_raw_transactions_for_addresses(addresses: list, case_id: Optional[str] = None) -> list:
+    """Raw tx objects (not flattened edges) for the common-input-ownership
+    heuristic, which needs the full vin[].prevout structure."""
+    require_online("btc_client.get_raw_transactions_for_addresses")
+    raw_txs, seen_txids = [], set()
+    for address in addresses:
+        url = f"{MEMPOOL_BASE}/address/{address}/txs"
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        payload = resp.json()
+        if case_id:
+            record_raw_evidence(case_id, f"btc_client.get_raw_transactions_for_addresses:{address}", {"txs": payload})
+        for tx in payload:
+            if tx["txid"] not in seen_txids:
+                raw_txs.append(tx)
+                seen_txids.add(tx["txid"])
+    return raw_txs

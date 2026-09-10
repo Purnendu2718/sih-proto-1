@@ -4,20 +4,12 @@ from app.services.attribution_store import upsert_attribution
 
 def detect_common_input_ownership(btc_transactions: list) -> dict:
     """
-    Multi-Input Co-Spending Heuristic (a.k.a. common-input-ownership).
-
-    If two or more distinct addresses are used together as INPUTS to the
-    SAME transaction, the private keys for all of them had to be
-    available to whoever signed and broadcast it — so those input
-    addresses are treated as co-owned by one wallet/entity cluster. This
-    is a standard, published Bitcoin forensics technique (see Meiklejohn
-    et al., "A Fistful of Bitcoins," 2013), used by essentially every
-    commercial chain-analysis firm — we are implementing a known,
-    peer-reviewed method, not inventing a new deanonymization technique.
-
-    Expects each item in `btc_transactions` to be a raw Esplora-style tx
-    object (as returned by btc_client.get_transaction / the /txs list),
-    with `vin[].prevout.scriptpubkey_address` populated.
+    Multi-Input Co-Spending Heuristic (common-input-ownership): if two or
+    more addresses are used together as INPUTS to the SAME transaction,
+    whoever signed it controlled all their keys, so they're treated as
+    one cluster. Standard, published Bitcoin forensics (Meiklejohn et al.,
+    "A Fistful of Bitcoins," 2013) — a known method, not a novel one.
+    Expects raw Esplora-style tx objects with vin[].prevout populated.
     """
     adjacency = defaultdict(set)
     for tx in btc_transactions:
@@ -31,8 +23,7 @@ def detect_common_input_ownership(btc_transactions: list) -> dict:
         for addr in input_addrs:
             adjacency[addr] |= input_addrs
 
-    merged = []
-    seen = set()
+    merged, seen = [], set()
     for addr, group in adjacency.items():
         if addr in seen:
             continue
@@ -59,7 +50,7 @@ def detect_common_input_ownership(btc_transactions: list) -> dict:
                 "cluster_members": sorted(cluster),
             }
             upsert_attribution(
-                address=addr, chain="BTC", exchange_name=None,
+                address=addr, chain="BTC", category="unknown",
                 entity_label=f"Co-Spend Cluster ({len(cluster)} addresses)",
                 attribution_rule="multi_input_co_spending_heuristic", confidence=confidence,
             )

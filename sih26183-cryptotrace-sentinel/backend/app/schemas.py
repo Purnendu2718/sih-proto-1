@@ -1,121 +1,78 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-
-
-class TraceStartRequest(BaseModel):
-    # Support both address (Prompt 3) and start_address (legacy)
-    address: Optional[str] = None
-    start_address: Optional[str] = None
-    victim_address: Optional[str] = None
-    tx_hash: Optional[str] = None
-    scenario: Optional[str] = None
-    case_id: Optional[str] = None
-    fir_number: Optional[str] = "FIR/CYBER/2026/0402"
-    chain: Optional[str] = None  # "TRON" | "EVM" | "BTC"
-    data_mode: Optional[str] = "mock"  # "mock" | "live"
-    use_mock_fallback: bool = True
-    max_hops: int = 5
-    max_time_window_seconds: int = 14400
-    min_amount_threshold: float = 1.0
-
-    def get_target_address(self) -> str:
-        return (self.address or self.start_address or self.victim_address or "").strip()
-
-
-class TraceStartResponse(BaseModel):
-    case_id: str
-    trace_id: str
-    detected_chain: str
-    transfer_count: int
-    data_source: str  # "live" | starts with "mock_fallback:"
-    warning: Optional[str] = None
-    reached_exchange: bool = False
-    destination_vasp: Optional[str] = None
-    terminal_amount: float = 0.0
-    hop_count: int = 0
-    trace_time_ms: float = 0.0
-    primary_path_addresses: List[str] = []
-    typology_summary: str = ""
+from pydantic import BaseModel
+from typing import List, Optional, Literal
 
 
 class GraphNode(BaseModel):
     id: str
-    label: str
-    node_type: str  # victim | mule | peel_outlet | exchange_deposit | exchange_hotwallet
-    node_class: Optional[str] = None  # alias for frontend styling
-    risk_score: int
-    role_tag: str
-    cluster_label: str
-    balance_hint: Optional[str] = None
-    label_confidence: float = 1.0
-    is_on_primary_path: bool = False
-    isCorePath: Optional[bool] = None
-    parentBoxId: Optional[str] = None
-    risk_severity: Optional[str] = "HIGH"
-    risk_breakdown: Optional[Dict[str, Any]] = None
-    risk_rules: Optional[List[Dict[str, Any]]] = None
-    risk_explanation: Optional[str] = None
+    display_label: str
+    truncated_address: str
+    node_type: Literal["origin", "mule", "mixer_bridge", "cex", "unknown"]
+    cex_role: Optional[Literal["deposit", "hotwallet"]] = None
+    exchange_name: Optional[str] = None
+    attribution_rule: Optional[str] = None
+    confidence: Optional[float] = None
+    chain: str
+    color: str
 
 
 class GraphEdge(BaseModel):
     source: str
     target: str
+    token_symbol: str
     amount: float
-    token: str
-    token_symbol: Optional[str] = None
+    usd_value: Optional[float] = None
     timestamp_utc: int
-    time_str: str
     tx_hash: str
-    is_primary: bool
-    isCorePath: Optional[bool] = None
-    parentBoxId: Optional[str] = None
-    velocity_mins: int
+    is_likely_change: bool = False
 
 
-class ModusOperandiBrief(BaseModel):
-    title: str
-    typology: str
-    time_to_exchange_mins: int
-    stolen_amount_usd: float
-    intermediary_mules_count: int
-    identified_vasp: str
-    target_deposit_wallet: str
-    recommended_legal_action: str
-    narrative: str
-    case_risk_score: Optional[int] = 85
-    case_risk_severity: Optional[str] = "HIGH"
-    case_risk_breakdown: Optional[Dict[str, Any]] = None
-
-
-class TraceGraphResponse(BaseModel):
-    case_id: str
-    trace_id: str
-    data_source: str = "live"
+class Graph(BaseModel):
     nodes: List[GraphNode]
     edges: List[GraphEdge]
-    brief: Optional[ModusOperandiBrief] = None
-    primary_path: List[str] = []
 
 
-class OffRampPathEdge(BaseModel):
-    source: str
-    target: str
-    amount: float
-    token: str
-    tx_hash: str
-    timestamp_utc: int
+class TraceStartRequest(BaseModel):
+    case_id: str
+    fir_number: str
+    start_address: str
+    chain: Literal["TRON", "EVM", "BTC"]
+    data_mode: Literal["mock", "live"] = "mock"
+    network: Optional[Literal["ETH", "BSC", "POLYGON"]] = "ETH"
+    max_hops: int = 5
+    max_time_window_seconds: int = 14400
+    min_amount_threshold: float = 1.0
 
 
-class OffRampResponse(BaseModel):
-    found: bool
-    hops_searched: int
-    truncated: bool
-    path: List[OffRampPathEdge]
-    terminal_label: str
-    disclaimer: str = (
-        "Heuristic off-ramp detection is an investigative lead, not conclusive proof of account "
-        "ownership or CEX deposit attribution. Verification with exchange compliance under Section 94 BNSS is required."
-    )
+class TraceStartResponse(BaseModel):
+    trace_id: str
+    reached_exchange: bool
+    exchange_attribution_message: Optional[str] = None
+    terminal_amount: float
+    hop_count: int
+    trace_time_ms: float
+
+
+class SearchRequest(BaseModel):
+    query: str
+    chain_hint: Optional[Literal["TRON", "EVM", "BTC"]] = None
+    network: Optional[Literal["ETH", "BSC", "POLYGON"]] = "ETH"
+    case_id: str = "LIVE-SEARCH"
+
+
+class SearchResponse(BaseModel):
+    detected_chain: str
+    detected_type: str
+    resolved_query: str
+    graph: Graph
+
+
+class ExpandRequest(BaseModel):
+    address: str
+    chain: Literal["TRON", "EVM", "BTC"]
+    network: Optional[Literal["ETH", "BSC", "POLYGON"]] = "ETH"
+    direction: Literal["in", "out", "both"] = "both"
+    limit: int = 25
+    case_id: str = "LIVE-SEARCH"
 
 
 class VaspAttributionRequest(BaseModel):
@@ -124,26 +81,36 @@ class VaspAttributionRequest(BaseModel):
 
 class VaspAttributionResponse(BaseModel):
     address: str
-    attributed: bool = False
-    attributed_to: Optional[str] = None
-    confidence: float = 0.0
-    rule: str = "NONE"
-    evidence_tx_hash: Optional[str] = None
-    disclaimer: str = (
-        "Attribution based on known VASP cluster heuristics. Exchange records must be "
-        "subpoenaed to establish beneficial ownership."
-    )
-    # Backwards compatibility fields
-    is_known_vasp: bool = False
+    is_known: bool
+    category: str = "unknown"
     exchange_name: Optional[str] = None
     entity_label: Optional[str] = None
-    compliance_email: Optional[str] = None
-    attribution_method: str = "none"
+    attribution_rule: Optional[str] = None
+    confidence: float = 0.0
+
+
+class AutoInvestigateRequest(BaseModel):
+    victim_address: str
+    chain_hint: Optional[Literal["TRON", "EVM", "BTC"]] = None
+    network: Optional[Literal["ETH", "BSC", "POLYGON"]] = "ETH"
+    max_hops: int = 5
+    max_time_window_seconds: int = 14400
+    case_id: str = "AUTO-CASE"
+
+
+class AutoInvestigateResponse(BaseModel):
+    detected_chain: str
+    reached_exchange: bool
+    exchange_attribution_message: Optional[str] = None
+    hop_count: int
+    trace_time_ms: float
+    golden_hour_seconds_elapsed: float
 
 
 class FreezeNoticeRequest(BaseModel):
     case_id: str
     fir_number: str
+    ncrp_ack_number: str
     investigating_officer: str
     police_station: str
     exchange_name: str
@@ -152,28 +119,5 @@ class FreezeNoticeRequest(BaseModel):
     transaction_hashes: List[str]
     victim_amount_inr: float
     narrative: str
-
-
-class NodeExpandRequest(BaseModel):
-    case_id: str
-    address: str
-    direction: Optional[str] = "both"  # "inbound" | "outbound" | "both"
-
-
-class NodeExpandResponse(BaseModel):
-    expanded_address: str
-    new_nodes: List[Dict[str, Any]]
-    new_edges: List[Dict[str, Any]]
-    total_nodes: int
-    total_edges: int
-
-
-class NoticeTextResponse(BaseModel):
-    case_id: str
-    fir_number: str
-    exchange_name: str
-    compliance_email: str
-    evidence_digest_sha256: str
-    statutory_seal: str
-    notice_text: str
-
+    fraud_date_ddmmyyyy: str
+    primary_token_symbol: str = "USDT"

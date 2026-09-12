@@ -1,15 +1,5 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  background-color: #08080a;
-}
-
-html, body {
-  cursor: auto;
-}
-
-button, a, [role="button"], .btn-magnetic {
-  cursor: pointer;
-}
+html, body, #root { height: 100%; margin: 0; background-color: #111827; }

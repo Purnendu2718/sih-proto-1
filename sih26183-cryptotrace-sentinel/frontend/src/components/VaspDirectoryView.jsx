@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Building2, Shield, CheckCircle2, AlertCircle, Download, Search, ExternalLink } from "lucide-react";
 import { getVaspDirectory } from "../services/api";
-import ProvenanceBadge from "./ProvenanceBadge";
 
 export default function VaspDirectoryView({ onBack = null }) {
   const [vasps, setVasps] = useState([]);
@@ -184,11 +183,8 @@ export default function VaspDirectoryView({ onBack = null }) {
                   const isVerified = vasp.verification_status === "VERIFIED";
                   return (
                     <tr key={idx} className="hover:bg-slate-900/50 transition">
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-100">{vasp.vasp_name}</div>
-                        <div className="mt-1">
-                          <ProvenanceBadge provenance={vasp.provenance || (isVerified ? "offchain_verified" : "automated_clustering")} size="xs" />
-                        </div>
+                      <td className="px-4 py-3 font-semibold text-slate-100">
+                        {vasp.vasp_name}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-slate-300 font-mono text-[11px]">{vasp.jurisdiction}</div>

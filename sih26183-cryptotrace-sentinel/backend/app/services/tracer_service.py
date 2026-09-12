@@ -13,18 +13,14 @@ from app.services.price_service import get_usd_price
 
 SAMPLE_CASES_DIR = Path(__file__).resolve().parents[3] / "sample_cases"
 TRACE_STORE = {}
-from app.services.cross_chain_engine import CrossChainResolver
-
-SAMPLE_CASES_DIR = Path(__file__).resolve().parents[3] / "sample_cases"
-TRACE_STORE = {}
-CHAIN_MAP = {"TRON": 0, "EVM": 1, "BTC": 2, "ETH": 1, "BSC": 3, "POLYGON": 4, "ARBITRUM": 5}
+CHAIN_MAP = {"TRON": 0, "EVM": 1, "BTC": 2}
 
 
 def _load_mock_edges(start_address: str) -> dict:
     for path in SAMPLE_CASES_DIR.glob("*.json"):
         with open(path) as f:
             scenario = json.load(f)
-        if scenario.get("victim_address") == start_address:
+        if scenario["victim_address"] == start_address:
             return scenario
     raise FileNotFoundError(f"No mock scenario found for {start_address}")
 
@@ -45,46 +41,29 @@ def _fetch_live_edges(chain: str, address: str, network: str, case_id: str) -> l
 
 
 def run_trace(req: TraceStartRequest) -> TraceStartResponse:
-    scenario = None
     if req.data_mode == "mock":
         scenario = _load_mock_edges(req.start_address)
         raw_edges = [
             {"from": e["from"], "to": e["to"], "amount": e["amount"], "ts": e["ts"],
-             "tx": e["tx"], "token_symbol": e.get("token_symbol", e.get("token", "USDT")),
-             "chain": e.get("chain", req.chain)}
-            for e in scenario.get("edges", [])
+             "tx": e["tx"], "token_symbol": e.get("token_symbol", "USDT")}
+            for e in scenario["edges"]
         ]
-        known_exchange_addrs = list(scenario.get("known_exchange_hot_wallets", [])) + \
-                               list(scenario.get("known_exchange_deposit_addresses", []))
-        if scenario.get("target_deposit_wallet"):
-            known_exchange_addrs.append(scenario["target_deposit_wallet"])
-        if scenario.get("terminal_hot_wallet"):
-            known_exchange_addrs.append(scenario["terminal_hot_wallet"])
+        known_exchange_addrs = scenario["known_exchange_hot_wallets"] + scenario["known_exchange_deposit_addresses"]
     else:
         live_edges = _fetch_live_edges(req.chain, req.start_address, req.network, req.case_id)
         raw_edges = [
             {"from": e["from"], "to": e["to"], "amount": e["amount"], "ts": e["timestamp_utc"],
-             "tx": e["tx_hash"], "token_symbol": e.get("token_symbol", "TOKEN"),
-             "chain": e.get("chain", req.chain)}
+             "tx": e["tx_hash"], "token_symbol": e.get("token_symbol", "TOKEN")}
             for e in live_edges
         ]
         known_exchange_addrs = []
-
-    # 1. Seamlessly stitch cross-chain bridge and DEX hops into the edge list
-    raw_edges = CrossChainResolver.stitch_cross_chain_trace(raw_edges)
 
     sweep_attrs = detect_and_persist_sweep_attribution(raw_edges, chain=req.chain)
     exchange_addrs = list(set(known_exchange_addrs) | set(sweep_attrs.keys())) or ["__NO_EXCHANGE_CANDIDATE__"]
 
     tx_edges = [
-        TxEdgeInput(
-            from_addr=e["from"],
-            to_addr=e["to"],
-            amount=e["amount"],
-            timestamp_utc=e["ts"],
-            tx_hash=e["tx"],
-            chain_id=CHAIN_MAP.get((e.get("chain") or req.chain).upper(), 1)
-        )
+        TxEdgeInput(from_addr=e["from"], to_addr=e["to"], amount=e["amount"],
+                    timestamp_utc=e["ts"], tx_hash=e["tx"], chain_id=CHAIN_MAP.get(req.chain, 0))
         for e in raw_edges
     ]
 
@@ -100,57 +79,26 @@ def run_trace(req: TraceStartRequest) -> TraceStartResponse:
     elapsed_ms = (time.perf_counter() - t0) * 1000
 
     hop_addrs = {h["address"] for h in trace_result["hops"]}
-    bridge_hops = [h for h in trace_result["hops"] if CrossChainResolver.is_bridge_contract(h["address"])]
-
     message = None
     for addr, info in sweep_attrs.items():
         if addr in hop_addrs or addr == req.start_address:
             message = info["message"]
             break
-
     if message is None and trace_result["reached_exchange"]:
         from app.services.attribution_store import lookup_attribution
         for h in reversed(trace_result["hops"]):
             attrib = lookup_attribution(h["address"])
             if attrib and attrib.get("exchange_name"):
-                b_note = ""
-                if bridge_hops:
-                    b_info = CrossChainResolver.get_bridge_info(bridge_hops[0]["address"])
-                    b_name = b_info["name"] if b_info else "Bridge"
-                    b_note = f" via Cross-Chain {b_name}"
-                message = f"Attributed to: {attrib['exchange_name']}{b_note} via {attrib.get('entity_label', 'Exchange Cluster')} (Tx: {h['tx_hash']})"
+                message = f"Attributed to: {attrib['exchange_name']} via {attrib.get('entity_label', 'Exchange Cluster')} (Tx: {h['tx_hash']})"
                 break
 
-    if message is None and trace_result["reached_exchange"] and scenario and scenario.get("destination_vasp"):
-        b_note = ""
-        if bridge_hops:
-            b_info = CrossChainResolver.get_bridge_info(bridge_hops[0]["address"])
-            b_name = b_info["name"] if b_info else "Bridge"
-            b_note = f" via Cross-Chain {b_name}"
-        message = f"Attributed to: {scenario['destination_vasp']}{b_note} (Terminal Off-Ramp)"
-
     all_addrs = {req.start_address} | {e["from"] for e in raw_edges} | {e["to"] for e in raw_edges}
-    nodes = [
-        build_graph_node(
-            address=addr,
-            chain=CrossChainResolver.infer_node_chain(addr, raw_edges, fallback_chain=req.chain),
-            origin_address=req.start_address
-        )
-        for addr in all_addrs
-    ]
-
+    nodes = [build_graph_node(addr, req.chain, req.start_address) for addr in all_addrs]
     edges = [
         GraphEdge(
-            source=e["from"],
-            target=e["to"],
-            token_symbol=e.get("token_symbol", "USDT"),
-            amount=e["amount"],
-            usd_value=(round(e["amount"] * get_usd_price(e.get("token_symbol", "USDT")), 2) or None),
-            timestamp_utc=e["ts"],
-            tx_hash=e["tx"],
-            edge_type=e.get("edge_type", "transfer"),
-            chain=e.get("chain"),
-            description=e.get("description"),
+            source=e["from"], target=e["to"], token_symbol=e["token_symbol"], amount=e["amount"],
+            usd_value=(round(e["amount"] * get_usd_price(e["token_symbol"]), 2) or None),
+            timestamp_utc=e["ts"], tx_hash=e["tx"],
         )
         for e in raw_edges
     ]

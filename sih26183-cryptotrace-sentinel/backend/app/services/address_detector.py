@@ -15,9 +15,8 @@ class InputType(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-_TRON_ADDR_RE = re.compile(r"^T[a-zA-Z0-9]{25,35}$")
+_TRON_ADDR_RE = re.compile(r"^T[a-zA-Z0-9]{33}$")
 _EVM_ADDR_RE = re.compile(r"^0x[a-fA-F0-9]{40}$")
-
 _EVM_TX_RE = re.compile(r"^0x[a-fA-F0-9]{64}$")
 _HEX64_RE = re.compile(r"^[a-fA-F0-9]{64}$")
 _BTC_LEGACY_RE = re.compile(r"^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$")

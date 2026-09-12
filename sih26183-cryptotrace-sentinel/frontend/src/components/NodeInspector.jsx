@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { generateFreezeNotice } from "../api";
-import ProvenanceBadge from "./ProvenanceBadge";
 
 const TYPE_CONFIG = {
   victim: { label: "Victim Reported", bg: "#450a0a", text: "#f87171", border: "#b91c1c" },
@@ -24,7 +23,6 @@ export default function NodeInspector({ selectedNode, traceMeta, currentChain })
 
   const typeMeta = TYPE_CONFIG[selectedNode.type] || TYPE_CONFIG.unknown;
   const isExchange = selectedNode.type === "exchange_deposit" || selectedNode.type === "exchange_hotwallet";
-  const nodeProvenance = selectedNode.provenance || (selectedNode.type === "victim" || isExchange ? "offchain_verified" : "automated_clustering");
 
   const handleDownloadNotice = async () => {
     setDownloading(true);
@@ -66,26 +64,23 @@ export default function NodeInspector({ selectedNode, traceMeta, currentChain })
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px", background: "var(--bg-card)", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", color: "var(--text-muted)" }}>
           Forensic Inspection
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <ProvenanceBadge provenance={nodeProvenance} size="xs" />
-          <span
-            style={{
-              fontSize: "11px",
-              padding: "2px 8px",
-              borderRadius: "12px",
-              background: typeMeta.bg,
-              color: typeMeta.text,
-              border: `1px solid ${typeMeta.border}`,
-              fontWeight: 500,
-            }}
-          >
-            {typeMeta.label}
-          </span>
-        </div>
+        <span
+          style={{
+            fontSize: "11px",
+            padding: "2px 8px",
+            borderRadius: "12px",
+            background: typeMeta.bg,
+            color: typeMeta.text,
+            border: `1px solid ${typeMeta.border}`,
+            fontWeight: 500,
+          }}
+        >
+          {typeMeta.label}
+        </span>
       </div>
 
       <div>

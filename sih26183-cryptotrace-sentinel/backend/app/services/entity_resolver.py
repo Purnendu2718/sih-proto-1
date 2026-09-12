@@ -37,13 +37,13 @@ def seed_static_entities():
                 upsert_attribution(
                     address=addr, chain=_infer_chain(addr), category="exchange", cex_role="hotwallet",
                     exchange_name=vasp["name"], entity_label=f"[{vasp['name']} Hot Wallet]",
-                    attribution_rule="static_seed", confidence=1.0, provenance="offchain_verified",
+                    attribution_rule="static_seed", confidence=1.0,
                 )
             for addr in vasp.get("known_deposit_addresses", []):
                 upsert_attribution(
                     address=addr, chain=_infer_chain(addr), category="exchange", cex_role="deposit",
                     exchange_name=vasp["name"], entity_label=f"[{vasp['name']} User Deposit]",
-                    attribution_rule="static_seed", confidence=1.0, provenance="offchain_verified",
+                    attribution_rule="static_seed", confidence=1.0,
                 )
 
     if ENTITY_SEED_PATH.exists():
@@ -55,7 +55,6 @@ def seed_static_entities():
                 category=e["category"],
                 exchange_name=e["label"] if e["category"] == "exchange" else None,
                 entity_label=e["label"], attribution_rule="static_seed", confidence=1.0,
-                provenance="offchain_verified",
             )
 
 

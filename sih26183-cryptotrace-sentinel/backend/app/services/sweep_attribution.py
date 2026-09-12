@@ -51,13 +51,11 @@ def detect_and_persist_sweep_attribution(edges: list, chain: str,
             exchange_name=inherited_exchange,
             entity_label="Exchange Master Hot Wallet" if inherited_exchange else "Suspected Exchange Hot Wallet",
             attribution_rule="zero_day_sweep_heuristic", confidence=confidence, evidence_tx_hash=sweep_tx,
-            provenance="automated_clustering",
         )
         results[dest] = {
             "exchange_name": inherited_exchange, "confidence": confidence,
             "attribution_rule": "zero_day_sweep_heuristic", "message": message,
             "evidence_tx_hash": sweep_tx, "source_count": len(distinct_sources),
-            "provenance": "automated_clustering",
         }
 
         for src in distinct_sources:
@@ -68,6 +66,5 @@ def detect_and_persist_sweep_attribution(edges: list, chain: str,
                               else "Suspected Exchange User Deposit"),
                 attribution_rule="zero_day_sweep_heuristic", confidence=max(confidence - 0.05, 0.0),
                 evidence_tx_hash=sweep_tx,
-                provenance="automated_clustering",
             )
     return results

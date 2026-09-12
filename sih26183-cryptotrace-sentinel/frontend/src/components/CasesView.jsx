@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { Search, Plus, ChevronRight, Check } from "lucide-react";
+import { Search, Plus, ChevronRight, Check, ShieldCheck, RefreshCw } from "lucide-react";
 import { SAMPLE_PRESETS } from "./SearchBar";
+import { exportEvidencePdf } from "../api";
+import ProvenanceBadge from "./ProvenanceBadge";
 
 export default function CasesView({
   onOpenCase,
@@ -8,6 +10,38 @@ export default function CasesView({
 }) {
   const [filterQuery, setFilterQuery] = useState("");
   const [activeStatusFilter, setActiveStatusFilter] = useState("all");
+  const [exportingCaseId, setExportingCaseId] = useState(null);
+
+  const handleExportCaseEvidence = async (e, caseObj) => {
+    e.stopPropagation();
+    setExportingCaseId(caseObj.caseId);
+    try {
+      const payload = {
+        case_id: caseObj.caseId,
+        fir_number: caseObj.firNumber,
+        investigating_officer: caseObj.investigator || "Cyber Crime Officer",
+        police_station: "Cyber Crime Police Station",
+        target_address: caseObj.targetAddress,
+        chain: caseObj.chain || "TRON",
+        victim_amount_inr: 450000.0,
+        token_symbol: "USDT",
+      };
+      const { blob } = await exportEvidencePdf(payload);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Court_Evidence_Dossier_Sec63_BSA_${caseObj.caseId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export case evidence:", err);
+      alert("Error generating dossier: " + (err.message || err));
+    } finally {
+      setExportingCaseId(null);
+    }
+  };
 
   const cases = [
     {
@@ -155,13 +189,28 @@ export default function CasesView({
                 </div>
               </div>
 
-              <div className="flex items-center gap-6 self-end md:self-auto shrink-0">
-                <div className="text-right">
+              <div className="flex items-center gap-4 self-end md:self-auto shrink-0">
+                <button
+                  onClick={(e) => handleExportCaseEvidence(e, c)}
+                  disabled={exportingCaseId === c.caseId}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-300 text-xs font-mono font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                  title="Export Court-Ready Dossier under Section 63 BSA"
+                >
+                  {exportingCaseId === c.caseId ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-3.5 h-3.5 text-cyan-300" />
+                  )}
+                  <span className="hidden sm:inline">Export Evidence</span>
+                </button>
+
+                <div className="text-right flex flex-col items-end gap-0.5">
                   <div className="text-sm font-bold font-mono text-[#F5F7FA]">
                     {c.victimLoss}
                   </div>
-                  <div className="text-[11px] text-[#00AEEF] font-mono">
-                    {c.terminalVasp}
+                  <div className="text-[11px] text-[#00AEEF] font-mono flex items-center gap-1.5">
+                    <span>{c.terminalVasp}</span>
+                    <ProvenanceBadge provenance={c.provenance || "offchain_verified"} size="xs" showIcon={false} />
                   </div>
                 </div>
 

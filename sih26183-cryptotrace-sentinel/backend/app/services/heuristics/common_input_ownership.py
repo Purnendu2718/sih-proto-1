@@ -53,5 +53,6 @@ def detect_common_input_ownership(btc_transactions: list) -> dict:
                 address=addr, chain="BTC", category="unknown",
                 entity_label=f"Co-Spend Cluster ({len(cluster)} addresses)",
                 attribution_rule="multi_input_co_spending_heuristic", confidence=confidence,
+                provenance="automated_clustering",
             )
     return attributions

@@ -5,6 +5,7 @@ Analytics, sweep detection, and risk scoring module.
 from .sweep_detector import SweepDetector, detect_cex_sweeps
 from .risk_scorer import RiskScorer, compute_risk_score
 from .graph_engine import GraphEngine
+from .cluster_detector import ClusterDetector
 
 __all__ = [
     "SweepDetector",
@@ -12,4 +13,5 @@ __all__ = [
     "RiskScorer",
     "compute_risk_score",
     "GraphEngine",
+    "ClusterDetector",
 ]

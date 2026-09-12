@@ -8,7 +8,7 @@
     { "name": "ZebPay", "compliance_email": "compliance@zebpay.com", "jurisdiction": "India",
       "hot_wallets": [], "known_deposit_addresses": [] },
     { "name": "Binance", "compliance_email": "compliance@binance.com", "jurisdiction": "Global",
-      "hot_wallets": ["0xBinanceHotWallet000000000000000000001"],
-      "known_deposit_addresses": ["0xBinanceDeposit0000000000000000000001"] }
+      "hot_wallets": ["0xBinanceHotWallet000000000000000000001", "0x28c6c06298d514db089934071355e5743bf21d60"],
+      "known_deposit_addresses": ["0xBinanceDeposit0000000000000000000001", "0xBscDepositBinance_99014a"] }
   ]
 }

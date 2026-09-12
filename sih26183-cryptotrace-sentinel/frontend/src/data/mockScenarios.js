@@ -11179,7 +11179,8 @@ export function getMockVaspDirectory() {
       turnaround_sla_hours: 2,
       freeze_api_supported: true,
       jurisdiction: "India",
-      known_hot_wallets: ["TCoinDCXHotWallet01XXXXXXXXXXXXXXXX", "0x71c3fb9904d3e33e9d8f8e02d847b74f38e63021"]
+      known_hot_wallets: ["TCoinDCXHotWallet01XXXXXXXXXXXXXXXX", "0x71c3fb9904d3e33e9d8f8e02d847b74f38e63021"],
+      provenance: "offchain_verified"
     },
     {
       exchange_name: "WazirX",
@@ -11190,7 +11191,8 @@ export function getMockVaspDirectory() {
       turnaround_sla_hours: 2,
       freeze_api_supported: true,
       jurisdiction: "India",
-      known_hot_wallets: ["0xWazirXHotWallet000000000000000000001"]
+      known_hot_wallets: ["0xWazirXHotWallet000000000000000000001"],
+      provenance: "offchain_verified"
     },
     {
       exchange_name: "ZebPay",
@@ -11201,7 +11203,8 @@ export function getMockVaspDirectory() {
       turnaround_sla_hours: 2,
       freeze_api_supported: true,
       jurisdiction: "India",
-      known_hot_wallets: ["0xZebPayHotWallet00000000000000000000001"]
+      known_hot_wallets: ["0xZebPayHotWallet00000000000000000000001"],
+      provenance: "offchain_verified"
     },
     {
       exchange_name: "Binance",
@@ -11212,7 +11215,8 @@ export function getMockVaspDirectory() {
       turnaround_sla_hours: 4,
       freeze_api_supported: true,
       jurisdiction: "International / India Registered",
-      known_hot_wallets: ["0xBinanceHotWallet000000000000000000001"]
+      known_hot_wallets: ["0xBinanceHotWallet000000000000000000001"],
+      provenance: "offchain_verified"
     }
   ];
 }

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import {
-  Search, ArrowLeft, Download, ShieldCheck, Copy, Check, CheckCircle2, RefreshCw
+  Search, ArrowLeft, Download, ShieldCheck, Copy, Check, CheckCircle2, RefreshCw, FileText
 } from "lucide-react";
-import { generateFreezeNotice } from "../services/api";
+import { exportEvidencePdf, exportEvidenceJson } from "../api";
 
 export default function EvidenceView({
   caseId = "CASE-SIH-2026",
@@ -11,9 +11,9 @@ export default function EvidenceView({
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedHash, setCopiedHash] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingJson, setDownloadingJson] = useState(false);
   const [verifying, setVerifying] = useState(false);
-
-  const evidenceDigest = "532163c7010e8208f2ec34e608d127d9e7ba19ae1f2c089818ee46115f53082a";
+  const [evidenceDigest, setEvidenceDigest] = useState("532163c7010e8208f2ec34e608d127d9e7ba19ae1f2c089818ee46115f53082a");
 
   const artifacts = [
     {
@@ -67,20 +67,21 @@ export default function EvidenceView({
       const payload = {
         case_id: caseId || "CASE-SIH-2026",
         fir_number: "FIR/CYBER/2026/0402",
+        ncrp_ack_number: "NCRP-2026-091823",
         investigating_officer: "Insp. Vikram Rathore",
         police_station: "Cyber Crime Police Station",
-        exchange_name: brief?.identified_vasp || "CoinDCX",
-        compliance_email: "compliance@coindcx.com",
-        frozen_addresses: ["TCoinDCXDeposit0001XXXXXXXXXXXXXXXX"],
-        transaction_hashes: ["0x8f2d9c1b4e6a7350129fec8714b35029e8471c039581a62048fbc927160359da"],
-        victim_amount_inr: 437500.0,
+        target_address: "TVictim0001XXXXXXXXXXXXXXXXXXXXXXX",
+        chain: "TRON",
+        victim_amount_inr: 485000.0,
+        token_symbol: "USDT",
         narrative: "Multi-hop structuring into exchange terminal under Golden Hour Protocol.",
       };
-      const blob = await generateFreezeNotice(payload);
+      const { blob, sha256 } = await exportEvidencePdf(payload);
+      if (sha256) setEvidenceDigest(sha256);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Evidence_Dossier_${caseId}.pdf`;
+      a.download = `Court_Evidence_Dossier_Sec63_BSA_${caseId}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -89,6 +90,37 @@ export default function EvidenceView({
       alert("Error generating dossier: " + (err.message || err));
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadJson = async () => {
+    setDownloadingJson(true);
+    try {
+      const payload = {
+        case_id: caseId || "CASE-SIH-2026",
+        fir_number: "FIR/CYBER/2026/0402",
+        ncrp_ack_number: "NCRP-2026-091823",
+        investigating_officer: "Insp. Vikram Rathore",
+        police_station: "Cyber Crime Police Station",
+        target_address: "TVictim0001XXXXXXXXXXXXXXXXXXXXXXX",
+        chain: "TRON",
+        victim_amount_inr: 485000.0,
+        token_symbol: "USDT",
+      };
+      const jsonData = await exportEvidenceJson(payload);
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Sealed_Evidence_Record_${caseId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Error exporting JSON: " + (err.message || err));
+    } finally {
+      setDownloadingJson(false);
     }
   };
 
@@ -149,9 +181,21 @@ export default function EvidenceView({
             onClick={handleDownloadPdf}
             disabled={downloading}
             className="px-3 py-1.5 rounded-lg bg-[#00AEEF] hover:bg-[#19B5FE] text-[#07111F] font-semibold text-xs transition flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+            title="Download Court-Ready PDF Dossier (Sec 63 BSA / Sec 94 BNSS)"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{downloading ? "Exporting..." : "Export"}</span>
+            <span className="hidden sm:inline">{downloading ? "Exporting..." : "Export PDF"}</span>
+          </button>
+
+          {/* Export JSON Action */}
+          <button
+            onClick={handleDownloadJson}
+            disabled={downloadingJson}
+            className="px-2.5 py-1.5 rounded-lg bg-[#122238] hover:bg-[#192f4d] text-[#AAB7C7] hover:text-[#F5F7FA] border border-[#223247] text-xs font-mono transition flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+            title="Download Cryptographically Signed Canonical JSON Record"
+          >
+            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">{downloadingJson ? "Saving..." : "JSON"}</span>
           </button>
         </div>
       </div>
